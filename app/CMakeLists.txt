@@ -18,7 +18,7 @@ link_directories(${FFMPEG_DIR}/${ANDROID_ABI}/lib)
 
 set(FFMPEG_LIB avformat avcodec avfilter avutil swresample swscale fdk-aac x264 z c m dl)
 
-set(LIB_SRC ${CPPDIR}/native-lib.cpp)
+set(LIB_SRC ${CPPDIR}/LCPlayer.cpp)
 
 set(ANDROID_SYSLIBS android log GLESv3 OpenSLES)
 
