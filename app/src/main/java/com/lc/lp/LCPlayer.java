@@ -21,11 +21,58 @@ public class LCPlayer implements GLSurfaceView.Renderer {
     LCPlayer(Context ctx) {
         mGLContext = ctx;
     }
+
     public native String stringFromJNI();
 
+    private native void ndkInitVideoPlayer();
+
+    private native void ndkStartPlayerWithFile(String fileName);
+
+    private native void ndkPauseVideoPlay();
+
+    private native void ndkStopVideoPlayer();
+
+    private native float ndkGetVideoSizeRatio();
+
+    private native float ndkGetVideoTotalSeconds();
+
+    private native void ndkSeekMedia(float nPos);
+
     private native void ndkInitGL(AssetManager assetManager);
+
     private native void ndkResizeGL(int width, int height);
+
     private native void ndkPaintGL();
+
+    public void initVideoPlayer() {
+        ndkInitVideoPlayer();
+    }
+
+    public void startVideoPlayerWithPath(String filePath) {
+        ndkStartPlayerWithFile(filePath);
+    }
+
+    public void pauseVideoPlayer() {
+        ndkPauseVideoPlay();
+    }
+
+    public void stopVideoPlayer() {
+        ndkStopVideoPlayer();
+    }
+
+    public float getVideoSizeRatio() {
+        float ratio = ndkGetVideoSizeRatio();
+        return ratio;
+    }
+
+    public float getVideoTotalSeconds() {
+        float ratio = ndkGetVideoTotalSeconds();
+        return ratio;
+    }
+
+    public void seekVideoPlayer(float pos) {
+        ndkSeekMedia(pos);
+    }
 
     @Override
     public void onSurfaceCreated(GL10 gl10, EGLConfig eglConfig) {

@@ -39,6 +39,62 @@ JNIEXPORT void JNICALL Java_com_lc_lp_LCPlayer_ndkResizeGL
 JNIEXPORT void JNICALL Java_com_lc_lp_LCPlayer_ndkPaintGL
   (JNIEnv *, jobject);
 
+/*
+ * Class:     com_lc_lp_LCPlayer
+ * Method:    ndkInitVideoPlayer
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_lc_lp_LCPlayer_ndkInitVideoPlayer
+        (JNIEnv *, jobject);
+
+/*
+ * Class:     com_lc_lp_LCPlayer
+ * Method:    ndkStartPlayerWithFile
+ * Signature: (Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_com_lc_lp_LCPlayer_ndkStartPlayerWithFile
+        (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     com_lc_lp_LCPlayer
+ * Method:    ndkPauseVideoPlay
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_lc_lp_LCPlayer_ndkPauseVideoPlay
+        (JNIEnv *, jobject);
+
+/*
+ * Class:     com_lc_lp_LCPlayer
+ * Method:    ndkStopVideoPlayer
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_lc_lp_LCPlayer_ndkStopVideoPlayer
+        (JNIEnv *, jobject);
+
+/*
+ * Class:     com_lc_lp_LCPlayer
+ * Method:    ndkGetVideoSizeRatio
+ * Signature: ()F
+ */
+JNIEXPORT jfloat JNICALL Java_com_lc_lp_LCPlayer_ndkGetVideoSizeRatio
+        (JNIEnv *, jobject);
+
+/*
+ * Class:     com_lc_lp_LCPlayer
+ * Method:    ndkGetVideoTotalSeconds
+ * Signature: ()F
+ */
+JNIEXPORT jfloat JNICALL Java_com_lc_lp_LCPlayer_ndkGetVideoTotalSeconds
+        (JNIEnv *, jobject);
+
+/*
+ * Class:     com_lc_lp_LCPlayer
+ * Method:    ndkSeekMedia
+ * Signature: (F)V
+ */
+JNIEXPORT void JNICALL Java_com_lc_lp_LCPlayer_ndkSeekMedia
+        (JNIEnv *, jobject, jfloat);
+
 #ifdef __cplusplus
 }
 #endif
