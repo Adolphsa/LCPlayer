@@ -10,11 +10,11 @@
 #include <atomic>
 #include <thread>
 #include <vector>
+#include "LCYUVDataDefine.h"
+#include "LCQueueDef.h"
 
 using namespace std;
 
-#include "LCYUVDataDefine.h"
-#include "LCQueueDef.h"
 
 extern "C" {
 #include<libavcodec/avcodec.h>
@@ -40,6 +40,9 @@ enum MediaPlayStatus
     MEDIA_PLAY_STATUS_SEEK,
     MEDIA_PLAY_STATUS_STOP
 };
+
+typedef void  (*UpdateVideo2GUI_Callback)    (YUVData_Frame* yuv,unsigned long userData);
+typedef void  (*UpdateCurrentPTS_Callback)   (float pts,unsigned long userData);
 
 class LCAVCodecHandler {
 public:
@@ -67,7 +70,35 @@ public:
 
     int GetPlayerStatus();
 
+    void SetupUpdateVideoCallback(UpdateVideo2GUI_Callback callback, unsigned long userData);
+    void SetupUpdateCurrentPTSCallback(UpdateCurrentPTS_Callback callback, unsigned long userData);
+
 private:
+
+    void convertAndRenderVideo(AVFrame* decodedFrame,long long ppts);
+    void convertAndPlayAudio(AVFrame* decodedFrame);
+    void copyDecodedFrame(uint8_t* src, uint8_t* dist,int linesize, int width, int height);
+    void copyDecodedFrame420(uint8_t* src, uint8_t* dist,int linesize, int width, int height);
+
+    void decodeAndRenderVideo();
+
+    void tickVideoFrameTimerDelay(int64_t pts);
+    void tickAudioFrameTimerDelay(int64_t pts);
+
+    void doReadMediaFrameThread();
+    void doAudioDecodePlayThread();
+    void doVideoDecodeShowThread();
+
+    void readMediaPacket();
+    void freePacket(AVPacket* pkt);
+
+    float getAudioTimeStampFromPTS(int64 pts);
+    float getVideoTimeStampFromPTS(int64 pts);
+
+    void startMediaProcessThreads();
+    void waitAllThreadsExit();
+
+    void stdThreadSleep(int mseconds);
 
     void resetAllMediaPlayerParameters();
 
@@ -89,6 +120,11 @@ private:
     bool m_bVideoSeekingOk = false;
 
 
+    unsigned long               m_userDataVideo=0;
+    UpdateVideo2GUI_Callback    m_updateVideoCallback =NULL;
+
+    unsigned long               m_userDataPts=0;
+    UpdateCurrentPTS_Callback   m_updateCurrentPTSCallback =NULL;
 
     MediaPlayStatus m_eMediaPlayStatus;
 
