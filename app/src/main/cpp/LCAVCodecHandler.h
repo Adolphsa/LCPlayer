@@ -44,6 +44,7 @@ enum MediaPlayStatus
 typedef void  (*UpdateVideo2GUI_Callback)    (YUVData_Frame* yuv,unsigned long userData);
 typedef void  (*UpdateCurrentPTS_Callback)   (float pts,unsigned long userData);
 
+
 class LCAVCodecHandler {
 public:
     explicit LCAVCodecHandler();
@@ -120,11 +121,11 @@ private:
     bool m_bVideoSeekingOk = false;
 
 
-    unsigned long               m_userDataVideo=0;
-    UpdateVideo2GUI_Callback    m_updateVideoCallback =NULL;
+    unsigned long               m_userDataVideo = 0;
+    UpdateVideo2GUI_Callback    m_updateVideoCallback = NULL;
 
-    unsigned long               m_userDataPts=0;
-    UpdateCurrentPTS_Callback   m_updateCurrentPTSCallback =NULL;
+    unsigned long               m_userDataPts = 0;
+    UpdateCurrentPTS_Callback   m_updateCurrentPTSCallback = NULL;
 
     MediaPlayStatus m_eMediaPlayStatus;
 

@@ -23,7 +23,7 @@ public:
 
     void SetSampleRate(int value){m_sampleRate = value;}
     void SetSampleSize(int value){m_sampleSize = value;}
-    void Setchannel(int value){m_channel = value;}
+    void SetChannel(int value){m_channel = value;}
 
 private:
     LCAudioPlayer();

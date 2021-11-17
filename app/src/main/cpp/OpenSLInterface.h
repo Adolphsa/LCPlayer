@@ -9,6 +9,7 @@
 #include <SLES/OpenSLES_Android.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct threadLock_ {
     pthread_mutex_t m;

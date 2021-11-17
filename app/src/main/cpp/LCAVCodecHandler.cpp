@@ -52,6 +52,23 @@ int LCAVCodecHandler::GetVideoHeight() {
     return m_videoHeight;
 }
 
+void LCAVCodecHandler::SetupUpdateVideoCallback(UpdateVideo2GUI_Callback callback, unsigned long userData)
+{
+    m_updateVideoCallback = callback;
+    m_userDataVideo = userData;
+}
+
+void LCAVCodecHandler::SetupUpdateCurrentPTSCallback(UpdateCurrentPTS_Callback callback, unsigned long userData)
+{
+    m_updateCurrentPTSCallback = callback;
+    m_userDataPts = userData;
+}
+
+// 音视频的几种情况 完善的播放器,需要做处理。
+// 1 有视频，有音频 m_pVideoCodecCtx != NULL m_pAudioCodecCtx != NULL 用音频同步视频
+// 2 有视频，没音频 m_pVideoCodecCtx != NULL m_pAudioCodecCtx == NULL 按照视频FPS自己播放
+// 3 有封面的mp3 同1 但只有一张封面图片，当作视频，相当于只有一帧视频.
+// 4 没有封面的mp3 盗版音乐 m_pVideoCodecCtx == NULL m_pAudioCodecCtx != NULL
 int LCAVCodecHandler::InitVideoCodec() {
     if (m_videoPathString.empty()) {
         LOGE("file path is Empty...");
@@ -138,6 +155,10 @@ int LCAVCodecHandler::InitVideoCodec() {
         }
     }
 
+    LCAudioPlayer::GetInstance()->SetSampleRate(m_sampleRate);
+    LCAudioPlayer::GetInstance()->SetSampleSize(m_sampleSize);
+    LCAudioPlayer::GetInstance()->SetChannel(m_channel);
+
     if (m_pVideoCodecCtx != nullptr) {
         m_pYUVFrame = av_frame_alloc();
         if (m_pYUVFrame == nullptr) {
@@ -185,6 +206,8 @@ int LCAVCodecHandler::InitVideoCodec() {
 
 void LCAVCodecHandler::StartPlayVideo() {
 
+    LCAudioPlayer::GetInstance()->StartAudioPlayer();
+
     startMediaProcessThreads();
 }
 
@@ -210,6 +233,8 @@ void LCAVCodecHandler::StopPlayVideo() {
 
     waitAllThreadsExit();
 
+    UnInitVideoCodec();
+
     resetAllMediaPlayerParameters();
 
     LOGD("======STOP PLAY VIDEO SUCCESS========");
@@ -229,10 +254,49 @@ void LCAVCodecHandler::startMediaProcessThreads() {
 }
 
 void LCAVCodecHandler::SeekMedia(float nPos) {
+    if (nPos < 0) {
+        return;
+    }
 
+    if (m_pFormatCtx == nullptr) {
+        return;
+    }
+
+    m_bThreadRunning = false;
+    m_bReadFileEOF = false;
+
+    if (m_mediaType == MEDIA_TYPE_VIDEO) {
+        LOGD("SEEK VIDEO");
+        m_nSeekingPos = (long long)nPos / av_q2d(m_vStreamTimeRational);
+        if( m_audioStreamIdx >= 0 && m_videoStreamIdx >= 0 ){
+            av_seek_frame(m_pFormatCtx, m_videoStreamIdx, m_nSeekingPos, AVSEEK_FLAG_BACKWARD );
+        }
+    }
+
+    if (m_mediaType == MEDIA_TYPE_MUSIC) {
+        LOGD("SEEK AUDIO");
+        m_nSeekingPos =(int64) nPos / av_q2d(m_aStreamTimeRational);
+        if( m_audioStreamIdx >= 0  ){
+            av_seek_frame(m_pFormatCtx, m_audioStreamIdx, m_nSeekingPos, AVSEEK_FLAG_ANY );
+        }
+    }
+
+    while ( !m_videoPktQueue.isEmpty() )
+    {
+        freePacket( m_videoPktQueue.dequeue() );
+    }
+
+    while ( !m_audioPktQueue.isEmpty() )
+    {
+        freePacket( m_audioPktQueue.dequeue());
+    }
+
+    waitAllThreadsExit();
+    startMediaProcessThreads();
 }
 
 void LCAVCodecHandler::waitAllThreadsExit() {
+
     while (m_bFileThreadRunning) {
         stdThreadSleep(10);
         continue;
@@ -268,14 +332,62 @@ int LCAVCodecHandler::GetPlayerStatus() {
 
 void LCAVCodecHandler::tickVideoFrameTimerDelay(int64_t pts) {
 
+    if (m_vStreamTimeRational.den <= 0) {
+        return;
+    }
+
+    float currentVideoTimeStamp = pts * av_q2d(m_vStreamTimeRational);
+
+    if (m_pAudioCodecCtx == NULL) {
+        //如果没有音频数据   用视频的fps来进行同步
+        float sleepTime = 1000.0/(float)m_videoFPS;
+        stdThreadSleep((int)sleepTime);
+
+        if (m_updateCurrentPTSCallback) {
+            m_updateCurrentPTSCallback(currentVideoTimeStamp, m_userDataPts);
+        }
+
+        return;
+    }
+
+    float diffTime = (currentVideoTimeStamp - m_nCurrAudioTimeStamp) * 1000;
+
+    int sleepTime = (int)diffTime;
+
+    LOGD("A TimeStamp: %f",m_nCurrAudioTimeStamp);
+    LOGD("AT: %f VT: %f ST: %d ",m_nCurrAudioTimeStamp, currentVideoTimeStamp, sleepTime);
+
+    if (sleepTime > 0 && sleepTime < 5000) {
+        stdThreadSleep(sleepTime);
+    } else {
+        //stdThreadSleep(0);
+    }
 }
 
 void LCAVCodecHandler::tickAudioFrameTimerDelay(int64_t pts) {
 
+    if(m_aStreamTimeRational.den <= 0){
+        return;
+    }
+
+    m_nCurrAudioTimeStamp = pts * av_q2d(m_aStreamTimeRational);
+
+    int diffTime = (int)(m_nCurrAudioTimeStamp - m_nLastAudioTimeStamp);
+
+    if (abs(diffTime) >= 1) {
+        if(m_updateCurrentPTSCallback){
+            m_updateCurrentPTSCallback(m_nCurrAudioTimeStamp, m_userDataPts);
+        }
+
+        m_nLastAudioTimeStamp = m_nCurrAudioTimeStamp;
+    }
+
 }
 
 void LCAVCodecHandler::doReadMediaFrameThread() {
+
     while (m_bThreadRunning) {
+
         m_bFileThreadRunning = true;
 
         if (m_eMediaPlayStatus == MEDIA_PLAY_STATUS_PAUSE) {
@@ -283,7 +395,7 @@ void LCAVCodecHandler::doReadMediaFrameThread() {
             continue;
         }
 
-        if (m_pVideoCodecCtx != NULL && m_pAudioCodecCtx != NULL) { //有视频,有音频
+        if (m_pVideoCodecCtx != nullptr && m_pAudioCodecCtx != nullptr) { //有视频,有音频
 
             if (m_videoPktQueue.size() > MAX_VIDEO_FRAME_IN_QUEUE &&
                 m_audioPktQueue.size() > MAX_AUDIO_FRAME_IN_QUEUE) {
@@ -291,14 +403,14 @@ void LCAVCodecHandler::doReadMediaFrameThread() {
                 continue;
             }
 
-        } else if (m_pVideoCodecCtx != NULL && m_pAudioCodecCtx == NULL) { //只有视频,没有音频
+        } else if (m_pVideoCodecCtx != nullptr && m_pAudioCodecCtx == nullptr) { //只有视频,没有音频
 
             float sleepTime = 1000.0 / (float) m_videoFPS;
             stdThreadSleep((int) sleepTime);
 
         } else { //只有音频
 
-            if (m_videoPktQueue.size() > MAX_AUDIO_FRAME_IN_QUEUE) {
+            if (m_audioPktQueue.size() > MAX_AUDIO_FRAME_IN_QUEUE) {
                 stdThreadSleep(10);
                 continue;
             }
@@ -321,6 +433,7 @@ void LCAVCodecHandler::doReadMediaFrameThread() {
 }
 
 void LCAVCodecHandler::readMediaPacket() {
+
     AVPacket *packet = (AVPacket *) malloc(sizeof(AVPacket));
     if (!packet) {
         return;
@@ -373,11 +486,12 @@ float LCAVCodecHandler::getVideoTimeStampFromPTS(int64 pts) {
 }
 
 void LCAVCodecHandler::doVideoDecodeShowThread() {
-    if (m_pFormatCtx == NULL) {
+
+    if (m_pFormatCtx == nullptr) {
         return;
     }
 
-    if (m_pVideoFrame == NULL) {
+    if (m_pVideoFrame == nullptr) {
         m_pVideoFrame = av_frame_alloc();
     }
 
@@ -396,7 +510,7 @@ void LCAVCodecHandler::doVideoDecodeShowThread() {
         }
 
         AVPacket *pkt = (AVPacket *) m_videoPktQueue.dequeue();
-        if (pkt == NULL) {
+        if (pkt == nullptr) {
             break;
         }
 
@@ -429,15 +543,17 @@ void LCAVCodecHandler::doVideoDecodeShowThread() {
 }
 
 void LCAVCodecHandler::doAudioDecodePlayThread() {
-    if (m_pFormatCtx == NULL) {
+
+    if (m_pFormatCtx == nullptr) {
         return;
     }
 
-    if (m_pAudioFrame == NULL) {
+    if (m_pAudioFrame == nullptr) {
         m_pAudioFrame = av_frame_alloc();
     }
 
     while (m_bThreadRunning) {
+
         m_bAudioThreadRunning = true;
 
         if (m_eMediaPlayStatus == MEDIA_PLAY_STATUS_PAUSE) {
@@ -451,7 +567,7 @@ void LCAVCodecHandler::doAudioDecodePlayThread() {
         }
 
         AVPacket *pkt = (AVPacket *) m_audioPktQueue.dequeue();
-        if (pkt == NULL) {
+        if (pkt == nullptr) {
             break;
         }
 
@@ -484,11 +600,13 @@ void LCAVCodecHandler::doAudioDecodePlayThread() {
 }
 
 void LCAVCodecHandler::convertAndRenderVideo(AVFrame *videoFrame, long long ppts) {
-    if (videoFrame == NULL) {
+
+    if (videoFrame == nullptr) {
         return;
     }
 
-    if (m_pVideoSwsCtx == NULL) {
+    if (m_pVideoSwsCtx == nullptr) {
+        //获取sws上下文
         m_pVideoSwsCtx = sws_getContext(m_pVideoCodecCtx->width, m_pVideoCodecCtx->height,
                                         m_pVideoCodecCtx->pix_fmt,
                                         m_pVideoCodecCtx->width, m_pVideoCodecCtx->height,
@@ -534,41 +652,41 @@ void LCAVCodecHandler::convertAndRenderVideo(AVFrame *videoFrame, long long ppts
 
     updateYUVFrame->pts = ppts;
 
-
     if(m_updateVideoCallback)
     {
-        m_updateVideoCallback(updateYUVFrame,m_userDataVideo);
+        m_updateVideoCallback(updateYUVFrame, m_userDataVideo);
     }
 
     if(updateYUVFrame->luma.dataBuffer){
         free(updateYUVFrame->luma.dataBuffer);
-        updateYUVFrame->luma.dataBuffer=NULL;
+        updateYUVFrame->luma.dataBuffer = nullptr;
     }
 
     if(updateYUVFrame->chromaB.dataBuffer){
         free(updateYUVFrame->chromaB.dataBuffer);
-        updateYUVFrame->chromaB.dataBuffer=NULL;
+        updateYUVFrame->chromaB.dataBuffer = nullptr;
     }
 
     if(updateYUVFrame->chromaR.dataBuffer){
         free(updateYUVFrame->chromaR.dataBuffer);
-        updateYUVFrame->chromaR.dataBuffer=NULL;
+        updateYUVFrame->chromaR.dataBuffer = nullptr;
     }
 
     if(updateYUVFrame){
         delete updateYUVFrame;
-        updateYUVFrame = NULL;
+        updateYUVFrame = nullptr;
     }
 
 }
 
 void LCAVCodecHandler::convertAndPlayAudio(AVFrame *decodedFrame) {
+
     if (!m_pFormatCtx || !m_pAudioFrame || !decodedFrame)
     {
         return ;
     }
 
-    if (m_pAudioSwrCtx == NULL) {
+    if (m_pAudioSwrCtx == nullptr) {
         m_pAudioSwrCtx = swr_alloc();
 
         swr_alloc_set_opts(m_pAudioSwrCtx,
@@ -578,16 +696,16 @@ void LCAVCodecHandler::convertAndPlayAudio(AVFrame *decodedFrame) {
                            av_get_default_channel_layout(m_pAudioCodecCtx->channels),
                            m_pAudioCodecCtx->sample_fmt,
                            m_pAudioCodecCtx->sample_rate,
-                           0, NULL);
+                           0, nullptr);
 
-        if (m_pAudioSwrCtx != NULL) {
+        if (m_pAudioSwrCtx != nullptr) {
             int ret = swr_init(m_pAudioSwrCtx);
             LOGD("swr_init RetValue: %d", ret);
             //qDebug()<<"swr_init RetValue:"<<ret;
         }
     }
 
-    int bufSize = av_samples_get_buffer_size(NULL, m_channel, decodedFrame->nb_samples, AV_SAMPLE_FMT_S16, 0);
+    int bufSize = av_samples_get_buffer_size(nullptr, m_channel, decodedFrame->nb_samples, AV_SAMPLE_FMT_S16, 0);
 
     if (!m_pSwrBuffer || m_swrBuffSize < bufSize) {
         m_swrBuffSize = bufSize;
@@ -596,7 +714,8 @@ void LCAVCodecHandler::convertAndPlayAudio(AVFrame *decodedFrame) {
 
     uint8_t *outbuf[2] = { m_pSwrBuffer, 0 };
 
-    int len = swr_convert(m_pAudioSwrCtx, outbuf,
+    int len = swr_convert(m_pAudioSwrCtx,
+                          outbuf,
                           decodedFrame->nb_samples,
                           (const uint8_t **)decodedFrame->data,
                           decodedFrame->nb_samples);
@@ -608,7 +727,7 @@ void LCAVCodecHandler::convertAndPlayAudio(AVFrame *decodedFrame) {
         return;
     }
 
-    LCAudioPlayer::GetInstance()->WriteAudioData((const char*)m_pSwrBuffer,bufSize);
+    LCAudioPlayer::GetInstance()->WriteAudioData((const char*)m_pSwrBuffer, bufSize);
 
 }
 
@@ -639,11 +758,59 @@ void LCAVCodecHandler::copyDecodedFrame(uint8_t *src, uint8_t *dist, int linesiz
 void LCAVCodecHandler::UnInitVideoCodec() {
     LOGD("UnInitVideoCodec...");
 
+    if (m_pSwrBuffer != nullptr) {
 
+        free(m_pSwrBuffer);
+    }
+
+    if(m_pAudioSwrCtx != nullptr)
+    {
+        swr_free(&m_pAudioSwrCtx);
+    }
+
+    if(m_pAudioFrame != nullptr)
+    {
+        av_frame_free(&m_pAudioFrame);
+    }
+
+    if(m_pAudioCodecCtx != nullptr)
+    {
+        avcodec_close(m_pAudioCodecCtx);
+    }
+
+    if(m_pYUV420Buffer != nullptr ){
+        av_free(m_pYUV420Buffer);
+    }
+
+    if(m_pYUVFrame != nullptr)
+    {
+        av_frame_free(&m_pYUVFrame);
+    }
+
+    if(m_pVideoSwsCtx  != nullptr)
+    {
+        sws_freeContext(m_pVideoSwsCtx );
+    }
+
+    if(m_pVideoFrame != nullptr)
+    {
+        av_frame_free(&m_pVideoFrame);
+    }
+
+    if(m_pVideoCodecCtx != nullptr)
+    {
+        avcodec_close(m_pVideoCodecCtx);
+    }
+
+    if(m_pFormatCtx != nullptr)
+    {
+        avformat_close_input(&m_pFormatCtx);
+    }
 }
 
 void LCAVCodecHandler::freePacket(AVPacket *pkt) {
-    if (pkt == NULL) {
+
+    if (pkt == nullptr) {
         return;
     }
 
@@ -658,16 +825,16 @@ void LCAVCodecHandler::stdThreadSleep(int mseconds) {
 
 void LCAVCodecHandler::resetAllMediaPlayerParameters() {
 
-    m_pFormatCtx = NULL;
-    m_pVideoCodecCtx = NULL;
-    m_pAudioCodecCtx = NULL;
-    m_pYUVFrame = NULL;
-    m_pVideoFrame = NULL;
-    m_pAudioFrame = NULL;
-    m_pAudioSwrCtx = NULL;
-    m_pVideoSwsCtx = NULL;
-    m_pYUV420Buffer = NULL;
-    m_pSwrBuffer = NULL;
+    m_pFormatCtx = nullptr;
+    m_pVideoCodecCtx = nullptr;
+    m_pAudioCodecCtx = nullptr;
+    m_pYUVFrame = nullptr;
+    m_pVideoFrame = nullptr;
+    m_pAudioFrame = nullptr;
+    m_pAudioSwrCtx = nullptr;
+    m_pVideoSwsCtx = nullptr;
+    m_pYUV420Buffer = nullptr;
+    m_pSwrBuffer = nullptr;
 
     m_videoWidth = 0;
     m_videoHeight = 0;

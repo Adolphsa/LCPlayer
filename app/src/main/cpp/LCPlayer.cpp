@@ -43,7 +43,7 @@ void Java_com_lc_lp_LCPlayer_ndkStartPlayerWithFile(JNIEnv *env, jobject thiz, j
     m_avCodecHandler.StopPlayVideo();
     m_avCodecHandler.SetVideoFilePath(filePath);
     m_avCodecHandler.InitVideoCodec();
-//    m_avCodecHandler.StartPlayVideo();
+    m_avCodecHandler.StartPlayVideo();
 }
 
 void Java_com_lc_lp_LCPlayer_ndkPauseVideoPlay(JNIEnv *env, jobject thiz) {
