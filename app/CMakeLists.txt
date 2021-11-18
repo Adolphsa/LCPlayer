@@ -18,6 +18,8 @@ link_directories(${FFMPEG_DIR}/${ANDROID_ABI}/lib)
 set(FFMPEG_LIB avformat avcodec avfilter avutil swresample swscale fdk-aac x264 z c m dl)
 
 set(LIB_SRC ${CPPDIR}/OpenSLInterface.c
+        ${CPPDIR}/LCOpenGLShader.cpp
+        ${CPPDIR}/LCGLVideoRender.cpp
         ${CPPDIR}/LCPlayer.cpp
         ${CPPDIR}/LCAVCodecHandler.cpp
         ${CPPDIR}/LCAudioPlayer.cpp)

@@ -354,8 +354,8 @@ void LCAVCodecHandler::tickVideoFrameTimerDelay(int64_t pts) {
 
     int sleepTime = (int)diffTime;
 
-    LOGD("A TimeStamp: %f",m_nCurrAudioTimeStamp);
-    LOGD("AT: %f VT: %f ST: %d ",m_nCurrAudioTimeStamp, currentVideoTimeStamp, sleepTime);
+//    LOGD("A TimeStamp: %f",m_nCurrAudioTimeStamp);
+//    LOGD("AT: %f VT: %f ST: %d ",m_nCurrAudioTimeStamp, currentVideoTimeStamp, sleepTime);
 
     if (sleepTime > 0 && sleepTime < 5000) {
         stdThreadSleep(sleepTime);

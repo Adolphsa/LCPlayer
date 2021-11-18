@@ -7,13 +7,16 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 
 import android.Manifest;
 import android.content.Intent;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -35,6 +38,8 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<Intent> launcherResult;
 
     private LCPlayer mLcPlayer;
+    private float         mVideoRatio;
+    private float         mVideoTotalSeconds;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +50,9 @@ public class MainActivity extends AppCompatActivity {
 
         //检查读写权限
         checkPermission();
+
+        mVideoRatio = 0;
+        mVideoTotalSeconds =0;
 
         // 注册需要写在onCreate或Fragment onAttach里，否则会报java.lang.IllegalStateException异常
         launcherResult = createActivityResultLauncher();
@@ -84,6 +92,18 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        mLcPlayer.initVideoPlayer();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mLcPlayer.stopVideoPlayer();
+    }
+
     /**
      * 选择媒体
      */
@@ -115,9 +135,15 @@ public class MainActivity extends AppCompatActivity {
                         String filePath = selectList.get(0).getRealPath();
                         Log.d(TAG, "onActivityResult: realPath = " + filePath);
                         mLcPlayer.startVideoPlayerWithPath(filePath);
+                        mVideoRatio = mLcPlayer.getVideoSizeRatio();
+                        mVideoTotalSeconds = mLcPlayer.getVideoTotalSeconds();
+                        Log.d(TAG,"video ratio: "+ mVideoRatio);
+                        Log.d(TAG,"video total seconds: "+ mVideoTotalSeconds);
                     }
 
                 }
+
+                updateVideoSize();
             }
         });
     }
@@ -139,6 +165,35 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                 });
+    }
+
+    public void UpdateVideoRenderCallback() {
+        binding.surfaceView.requestRender();
+    }
+
+    private void updateVideoSize()
+    {
+
+        WindowManager manager = this.getWindowManager();
+        DisplayMetrics outMetrics = new DisplayMetrics();
+        manager.getDefaultDisplay().getMetrics(outMetrics);
+        int width = outMetrics.widthPixels;
+        int height = outMetrics.heightPixels;
+
+
+        int topMargin = 0;
+        if(mVideoRatio > 1){
+            topMargin = 200;
+        }
+
+        ConstraintLayout.LayoutParams layoutParams=(ConstraintLayout.LayoutParams)binding.surfaceView.getLayoutParams();
+        layoutParams.topMargin = topMargin;
+        layoutParams.leftMargin = 0;
+        layoutParams.rightMargin = 0;
+        layoutParams.width = width;
+        layoutParams.height = (int)(width / mVideoRatio);
+
+        binding.surfaceView.setLayoutParams(layoutParams);
     }
 
 }

@@ -44,6 +44,22 @@ public class LCPlayer implements GLSurfaceView.Renderer {
 
     private native void ndkPaintGL();
 
+    @Override
+    public void onSurfaceCreated(GL10 gl10, EGLConfig eglConfig) {
+        AssetManager assetManager = mGLContext.getAssets();
+        ndkInitGL(assetManager);
+    }
+
+    @Override
+    public void onSurfaceChanged(GL10 gl10, int width, int height) {
+        ndkResizeGL(width, height);
+    }
+
+    @Override
+    public void onDrawFrame(GL10 gl10) {
+        ndkPaintGL();
+    }
+
     public void initVideoPlayer() {
         ndkInitVideoPlayer();
     }
@@ -66,27 +82,18 @@ public class LCPlayer implements GLSurfaceView.Renderer {
     }
 
     public float getVideoTotalSeconds() {
-        float ratio = ndkGetVideoTotalSeconds();
-        return ratio;
+        float totalSeconds = ndkGetVideoTotalSeconds();
+        return totalSeconds;
     }
 
     public void seekVideoPlayer(float pos) {
         ndkSeekMedia(pos);
     }
 
-    @Override
-    public void onSurfaceCreated(GL10 gl10, EGLConfig eglConfig) {
-        AssetManager assetManager = mGLContext.getAssets();
-        ndkInitGL(assetManager);
-    }
-
-    @Override
-    public void onSurfaceChanged(GL10 gl10, int width, int height) {
-        ndkResizeGL(width, height);
-    }
-
-    @Override
-    public void onDrawFrame(GL10 gl10) {
-        ndkPaintGL();
+    public void OnVideoRenderCallback() {
+        MainActivity activity = (MainActivity)mGLContext;
+        if(activity != null) {
+            activity.UpdateVideoRenderCallback();
+        }
     }
 }
