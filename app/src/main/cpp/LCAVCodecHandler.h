@@ -41,8 +41,8 @@ enum MediaPlayStatus
     MEDIA_PLAY_STATUS_STOP
 };
 
-typedef void  (*UpdateVideo2GUI_Callback)    (YUVData_Frame* yuv,unsigned long userData);
-typedef void  (*UpdateCurrentPTS_Callback)   (float pts,unsigned long userData);
+typedef void  (*UpdateVideo2GUI_Callback)    (YUVData_Frame* yuv, unsigned long userData);
+typedef void  (*UpdateCurrentPTS_Callback)   (float pts, unsigned long userData);
 
 
 class LCAVCodecHandler {
@@ -114,6 +114,7 @@ private:
     int m_videoStreamIdx = -1;
     int m_audioStreamIdx = -1;
 
+    int videoNullCount = 0;
     bool m_bReadFileEOF = false;
 
     int64 m_nSeekingPos = 0;

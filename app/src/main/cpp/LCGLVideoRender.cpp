@@ -55,11 +55,11 @@ void LCGLVideoRender::PaintGL()
 
     m_pOpenGLShader->SetUniformValue("uni_mat", objectMat);
 
-    m_pOpenGLShader->EnableAttributeArray("attr_position");
-    m_pOpenGLShader->EnableAttributeArray("attr_uv");
+    m_pOpenGLShader->EnableAttributeArray(0);
+    m_pOpenGLShader->EnableAttributeArray(1);
 
-    m_pOpenGLShader->SetAttributeBuffer("attr_position", GL_FLOAT, triangleVert, 3, sizeof(LCVertex));
-    m_pOpenGLShader->SetAttributeBuffer("attr_uv", GL_FLOAT, &triangleVert[0].u, 2, sizeof(LCVertex));
+    m_pOpenGLShader->SetAttributeBuffer(0, GL_FLOAT, triangleVert, 3, sizeof(LCVertex));
+    m_pOpenGLShader->SetAttributeBuffer(1, GL_FLOAT, &triangleVert[0].u, 2, sizeof(LCVertex));
 
     m_pOpenGLShader->SetUniformValue("uni_textureY",0);
     glActiveTexture(GL_TEXTURE0);
@@ -96,8 +96,8 @@ void LCGLVideoRender::PaintGL()
 
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    m_pOpenGLShader->DisableAttributeArray("attr_position");
-    m_pOpenGLShader->DisableAttributeArray("attr_uv");
+    m_pOpenGLShader->DisableAttributeArray(0);
+    m_pOpenGLShader->DisableAttributeArray(1);
 
     m_pOpenGLShader->Release();
 
@@ -151,5 +151,5 @@ void LCGLVideoRender::SetupAssetManager(AAssetManager *pManager)
 
 void LCGLVideoRender::loadShaderResources(AAssetManager *pManager)
 {
-    m_pOpenGLShader->InitShaderFromFile(pManager, "yuvplayv.glsl","yuvplayf.glsl");
+    m_pOpenGLShader->InitShaderFromFile(pManager, "vshader_yuvplay.glsl","fshader_yuvplay.glsl");
 }

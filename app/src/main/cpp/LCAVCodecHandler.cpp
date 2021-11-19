@@ -79,11 +79,13 @@ int LCAVCodecHandler::InitVideoCodec() {
     LOGD("file path = %s", filePath);
 
     int ret = 0;
+    //open input file
     if ((ret = avformat_open_input(&m_pFormatCtx, filePath, NULL, NULL)) != 0) {
         LOGE("avformat_open_input fail . %s", av_err2str(ret));
         return -1;
     }
 
+    //get video audio stream info
     if (avformat_find_stream_info(m_pFormatCtx, NULL) < 0) {
         LOGE("avformat_find_stream_info failed .");
         return -1;
@@ -103,6 +105,7 @@ int LCAVCodecHandler::InitVideoCodec() {
             m_videoStreamIdx = i;
             LOGD("Video index: %d", m_videoStreamIdx);
 
+            //find decoder
             AVCodec *codec = avcodec_find_decoder(codecParameters->codec_id);
             if (codec == nullptr) {
                 LOGE("Video AVCodec is NULL");
@@ -111,9 +114,11 @@ int LCAVCodecHandler::InitVideoCodec() {
             LOGD("video codecpar->codec_id = %d ,name = %s", codecParameters->codec_id,
                  avcodec_get_name(codecParameters->codec_id));
 
+            //create codec context
             m_pVideoCodecCtx = avcodec_alloc_context3(codec);
             avcodec_parameters_to_context(m_pVideoCodecCtx, codecParameters);
 
+            //open decoder
             if ((ret = avcodec_open2(m_pVideoCodecCtx, codec, NULL)) < 0) {
                 LOGE("video Could not open codec. %s", av_err2str(ret));
                 return -1;
@@ -214,6 +219,7 @@ void LCAVCodecHandler::StartPlayVideo() {
 void LCAVCodecHandler::StopPlayVideo() {
     m_bThreadRunning = false;
 
+    videoNullCount = 0;
     m_bReadFileEOF = false;
 
     m_nCurrAudioTimeStamp = 0.0f;
@@ -315,6 +321,7 @@ void LCAVCodecHandler::waitAllThreadsExit() {
 
 float LCAVCodecHandler::GetMediaTotalSeconds() {
     float totalDuration = m_pFormatCtx->duration / (AV_TIME_BASE * 1.000);
+    LOGD("totalDuration = %f" ,totalDuration);
     return totalDuration;
 }
 
@@ -844,6 +851,7 @@ void LCAVCodecHandler::resetAllMediaPlayerParameters() {
     m_videoStreamIdx = -1;
     m_audioStreamIdx = -1;
 
+    videoNullCount = 0;
     m_bReadFileEOF = false;
 
     m_nSeekingPos = 0;

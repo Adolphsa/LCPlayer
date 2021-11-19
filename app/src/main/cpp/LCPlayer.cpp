@@ -19,6 +19,7 @@ extern "C" {
 #endif
 
 void updateVideoData(YUVData_Frame* yuvFrame, unsigned long userData);
+void updateVideoPts(float pts, unsigned long userData);
 
 jstring Java_com_lc_lp_LCPlayer_stringFromJNI(JNIEnv *env, jobject thiz) {
     std::string hello = "Hello from C++ LCPlayer";
@@ -49,6 +50,7 @@ void Java_com_lc_lp_LCPlayer_ndkPaintGL(JNIEnv *env, jobject thiz) {
 void Java_com_lc_lp_LCPlayer_ndkInitVideoPlayer(JNIEnv *env, jobject thiz)
 {
     m_avCodecHandler.SetupUpdateVideoCallback(updateVideoData, NULL);
+    m_avCodecHandler.SetupUpdateCurrentPTSCallback(updateVideoPts, NULL);
     env->GetJavaVM(&g_jvm);
     g_obj = env->NewGlobalRef(thiz);
 }
@@ -66,12 +68,20 @@ void Java_com_lc_lp_LCPlayer_ndkStartPlayerWithFile(JNIEnv *env, jobject thiz, j
 
 void Java_com_lc_lp_LCPlayer_ndkPauseVideoPlay(JNIEnv *env, jobject thiz)
 {
+    m_avCodecHandler.SetMediaStatusPause();
+}
 
+void Java_com_lc_lp_LCPlayer_ndkPlayVideoPlay(JNIEnv *env, jobject thiz) {
+    m_avCodecHandler.SetMediaStatusPlay();
 }
 
 void Java_com_lc_lp_LCPlayer_ndkStopVideoPlayer(JNIEnv *env, jobject thiz)
 {
     m_avCodecHandler.StopPlayVideo();
+}
+
+jint Java_com_lc_lp_LCPlayer_ndkGetPlayStatus(JNIEnv *env, jobject thiz) {
+    return m_avCodecHandler.GetPlayerStatus();
 }
 
 jfloat Java_com_lc_lp_LCPlayer_ndkGetVideoSizeRatio(JNIEnv *env, jobject thiz)
@@ -138,6 +148,47 @@ void updateVideoData(YUVData_Frame* yuvFrame, unsigned long userData)
     }
 
     m_env->CallVoidMethod(g_obj, m_methodId);
+    m_env->DeleteLocalRef(m_class);
+}
+
+void updateVideoPts(float pts, unsigned long userData)
+{
+//    LOGD("PTS = %f", pts);
+
+    JNIEnv *m_env;
+    jmethodID m_methodId;
+    jclass m_class;
+
+    //Attach主线程
+    if (g_jvm->AttachCurrentThread(&m_env, NULL) != JNI_OK) {
+        LOGE("updateVideoPts  JVM: AttachCurrentThread failed");
+        return ;
+    }
+
+    //找到对应的类
+    m_class = m_env->GetObjectClass(g_obj);
+    if (m_class == NULL) {
+        LOGD("updateVideoPts JVM: FindClass error.....");
+        if(g_jvm->DetachCurrentThread() != JNI_OK)
+        {
+            LOGE("updateVideoPts JVM: DetachCurrentThread failed");
+        }
+        return ;
+    }
+
+    //再获得类中的方法
+    m_methodId = m_env->GetMethodID(m_class, "OnPtsCallback", "(F)V");
+    if (m_methodId == NULL)
+    {
+        LOGF("JVM: GetMethodID error.....");
+        //Detach主线程
+        if(g_jvm->DetachCurrentThread() != JNI_OK)
+        {
+            LOGE("JVM: DetachCurrentThread failed");
+        }
+    }
+
+    m_env->CallVoidMethod(g_obj, m_methodId, pts);
     m_env->DeleteLocalRef(m_class);
 }
 

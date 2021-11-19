@@ -95,6 +95,24 @@ JNIEXPORT jfloat JNICALL Java_com_lc_lp_LCPlayer_ndkGetVideoTotalSeconds
 JNIEXPORT void JNICALL Java_com_lc_lp_LCPlayer_ndkSeekMedia
         (JNIEnv *, jobject, jfloat);
 
+
+/*
+ * Class:     com_lc_lp_LCPlayer
+ * Method:    ndkGetPlayStatus
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_com_lc_lp_LCPlayer_ndkGetPlayStatus
+        (JNIEnv *, jobject);
+
+/*
+ * Class:     com_lc_lp_LCPlayer
+ * Method:    ndkPlayVideoPlay
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_lc_lp_LCPlayer_ndkPlayVideoPlay
+        (JNIEnv *, jobject) ;
+
+
 #ifdef __cplusplus
 }
 #endif
